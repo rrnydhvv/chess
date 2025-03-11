@@ -1,3 +1,4 @@
+
 import subprocess
 import sys
 
@@ -18,9 +19,10 @@ def install_and_import(package):
 install_and_import("pygame")
 install_and_import("chess")
 
+
 # Sau khi cài đặt xong, import bình thường
-import chess
 import pygame
+import chess
 
 # Khởi tạo pygame
 pygame.init()
@@ -138,16 +140,32 @@ def pawn_promotion(color):
 
 
 def display_game_over():
-    screen.fill(WHITE)
-    font = pygame.font.Font(None, 36)
     if board.is_checkmate():
+        if board.turn == chess.BLACK:
+            background_color = WHITE
+            text_color = BLACK
+        else:
+            background_color = BLACK
+            text_color = WHITE
         text = "Victory: " + ("White" if board.turn ==
                               chess.BLACK else "Black")
     elif board.is_stalemate() or board.is_insufficient_material() or board.is_seventyfive_moves() or board.is_fivefold_repetition():
+        # Nửa trên đen, nửa dưới trắng
+        screen.fill(BLACK, (0, 0, WIDTH, HEIGHT // 2))
+        screen.fill(WHITE, (0, HEIGHT // 2, WIDTH, HEIGHT // 2))
+        text_color = WHITE  # Chữ màu trắng cho phần trên
         text = "Draw!"
     else:
+        text_color = BLACK
+        background_color = WHITE
         text = "Game Over!"
-    text_surface = font.render(text, True, BLACK)
+
+    # Nếu không hòa, tô nền theo màu tương ứng
+    if not (board.is_stalemate() or board.is_insufficient_material() or board.is_seventyfive_moves() or board.is_fivefold_repetition()):
+        screen.fill(background_color)
+
+    font = pygame.font.Font(None, 36)
+    text_surface = font.render(text, True, text_color)
     screen.blit(text_surface, (WIDTH//2 -
                 text_surface.get_width()//2, HEIGHT//3))
 
@@ -163,11 +181,20 @@ def display_game_over():
         new_game_x, button_y, button_width, button_height)
     exit_button = pygame.Rect(exit_x, button_y, button_width, button_height)
 
-    pygame.draw.rect(screen, BLACK, new_game_button, 3)
-    pygame.draw.rect(screen, BLACK, exit_button, 3)
+    # Nếu hòa, đặt màu viền khác nhau cho hai nửa màn hình
+    if board.is_stalemate() or board.is_insufficient_material() or board.is_seventyfive_moves() or board.is_fivefold_repetition():
+        pygame.draw.rect(screen, BLACK, new_game_button, 3)
+        pygame.draw.rect(screen, BLACK, exit_button, 3)
+        new_game_text_color = BLACK
+        exit_text_color = BLACK
+    else:
+        pygame.draw.rect(screen, text_color, new_game_button, 3)
+        pygame.draw.rect(screen, text_color, exit_button, 3)
+        new_game_text_color = text_color
+        exit_text_color = text_color
 
-    new_game_text = button_font.render("New Game", True, BLACK)
-    exit_text = button_font.render("Exit", True, BLACK)
+    new_game_text = button_font.render("New Game", True, new_game_text_color)
+    exit_text = button_font.render("Exit", True, exit_text_color)
 
     new_game_text_x = new_game_button.x + \
         (button_width - new_game_text.get_width()) // 2
