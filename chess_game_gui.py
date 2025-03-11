@@ -1,5 +1,3 @@
-import chess
-import pygame
 import subprocess
 import sys
 
@@ -21,7 +19,8 @@ install_and_import("pygame")
 install_and_import("chess")
 
 # Sau khi cài đặt xong, import bình thường
-
+import chess
+import pygame
 
 # Khởi tạo pygame
 pygame.init()
