@@ -1,6 +1,27 @@
-import pygame
 import chess
-import chess.engine
+import pygame
+import subprocess
+import sys
+
+# Hàm kiểm tra và cài đặt thư viện nếu chưa có
+
+
+def install_and_import(package):
+    try:
+        __import__(package)
+    except ImportError:
+        print(f"{package} chưa được cài đặt. Đang tiến hành cài đặt...")
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", package])
+        print(f"{package} đã được cài đặt thành công!")
+
+
+# Kiểm tra và cài đặt các thư viện cần thiết
+install_and_import("pygame")
+install_and_import("chess")
+
+# Sau khi cài đặt xong, import bình thường
+
 
 # Khởi tạo pygame
 pygame.init()
