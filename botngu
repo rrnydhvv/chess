@@ -1,0 +1,163 @@
+import chess
+
+
+def piece_value(piece):
+    values = {
+        chess.PAWN: 4,
+        chess.KNIGHT: 12,
+        chess.BISHOP: 12,
+        chess.ROOK: 20,
+        chess.QUEEN: 36,
+    }
+    return values.get(piece.piece_type, 0)
+
+
+def controlled_squares_value(board, square, piece):
+    control_bonus = {
+        chess.PAWN: 2,
+        chess.KNIGHT: 2,
+        chess.BISHOP: 2,
+        chess.ROOK: 2,
+        chess.QUEEN: 1,
+    }
+    legal_moves = list(board.attacks(square))
+    empty_squares = [sq for sq in legal_moves if board.piece_at(sq) is None]
+
+    score = 0
+
+    if piece.piece_type in {chess.BISHOP, chess.ROOK, chess.QUEEN}:
+        score += (len(empty_squares) // 2) * control_bonus[piece.piece_type]
+    else:
+        score += len(empty_squares) * control_bonus.get(piece.piece_type)
+
+    return score
+
+
+def safety_score(board, square, color):
+    safety = 0
+    enemy_color = not color
+
+    attacking_enemies = len(list(board.attackers(enemy_color, square)))
+    protecting_allies = len(list(board.attackers(color, square)))
+
+    safety -= attacking_enemies
+    safety += protecting_allies
+
+    return safety
+
+
+def safety_table(board, color):
+    table = [[0 for _ in range(8)] for _ in range(8)]
+    for square in chess.SQUARES:
+        rank = chess.square_rank(square)
+        file = chess.square_file(square)
+        table[7 - rank][file] = safety_score(board, square, color)
+    return table
+
+
+def threat_score(board, color):
+    threat = 0
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece and piece.color == color:
+            for target in board.attacks(square):
+                target_piece = board.piece_at(target)
+                if target_piece:
+                    if target_piece.color != color:
+                        safety = safety_score(board, target, color)
+                        if safety >= 0:
+                            threat += piece_value(target_piece) - \
+                                piece_value(piece)
+                        if target_piece.piece_type == chess.QUEEN:
+                            threat += 10
+                        if board.is_checkmate():
+                            threat += 99999
+    return threat
+
+
+def evaluate_board(board, color):
+    total_score = 0
+    captured_score = 0
+
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece and piece.color == color and piece.piece_type != chess.KING:
+            total_score += piece_value(piece)
+            total_score += controlled_squares_value(board, square, piece)
+
+    total_score += threat_score(board, color)
+
+    # Tính điểm bắt quân
+    for move in board.legal_moves:
+        if board.is_capture(move):
+            captured_piece = board.piece_at(move.to_square)
+            if captured_piece:
+                if captured_piece.color != color:
+                    # Bắt quân đối thủ (+)
+                    captured_score += piece_value(captured_piece)
+                else:
+                    # Mất quân đồng minh (-)
+                    captured_score -= piece_value(captured_piece)
+
+    total_score += captured_score
+
+    return total_score
+
+
+def best_move(board, color):
+    best_score = float('-inf')
+    best_move = None
+
+    for move in board.legal_moves:
+        board.push(move)
+        score = evaluate_board(board, color)
+        board.pop()
+        if score > best_score:
+            best_score = score
+            best_move = move
+
+    return best_move, best_score
+
+
+def print_safety_table(table):
+    print("\nBảng điểm an toàn:")
+    print("     a  b  c  d  e  f  g  h")
+    for i, row in enumerate(table):
+        print(8 - i, " ", " ".join(f"{x:+d}" for x in row))
+
+
+# Khởi tạo bàn cờ
+board = chess.Board()
+
+# Chơi đến khi ván cờ kết thúc
+while not board.is_game_over():
+    for color in [chess.WHITE, chess.BLACK]:
+        if board.is_game_over():
+            break  # Dừng nếu ván cờ kết thúc
+
+        best_mv, best_score = best_move(board, color)
+        print(
+            f"Nước đi tốt nhất cho {'Trắng' if color == chess.WHITE else 'Đen'}: {best_mv} với điểm số: {best_score}"
+        )
+
+        if best_mv:
+            board.push(best_mv)
+
+        print(board)
+
+# Kiểm tra kết quả ván cờ
+result = board.result()
+if board.is_checkmate():
+    print("Kết quả: Chiếu bí!")
+elif board.is_stalemate():
+    print("Kết quả: Hòa do hết nước đi!")
+elif board.is_insufficient_material():
+    print("Kết quả: Hòa do thiếu quân!")
+elif board.is_seventyfive_moves():
+    print("Kết quả: Hòa do 75 nước đi không bắt quân!")
+elif board.is_fivefold_repetition():
+    print("Kết quả: Hòa do lặp lại 5 lần!")
+
+# In bảng điểm an toàn cuối cùng
+safety_tbl = safety_table(board, chess.WHITE)
+print_safety_table(safety_tbl)
