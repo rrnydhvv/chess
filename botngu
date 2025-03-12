@@ -1,163 +1,155 @@
 import chess
+import chess.engine
+
+# Giá trị điểm của từng quân cờ
+PIECE_VALUES = {
+    chess.PAWN: 1,
+    chess.KNIGHT: 3,
+    chess.BISHOP: 3,
+    chess.ROOK: 5,
+    chess.QUEEN: 9,
+    chess.KING: 0  # Vua không có giá trị cố định vì mất vua là thua
+}
+
+# Các ô trung tâm
+CENTER_SQUARES = [chess.D4, chess.D5, chess.E4, chess.E5]
 
 
-def piece_value(piece):
-    values = {
-        chess.PAWN: 4,
-        chess.KNIGHT: 12,
-        chess.BISHOP: 12,
-        chess.ROOK: 20,
-        chess.QUEEN: 36,
-    }
-    return values.get(piece.piece_type, 0)
-
-
-def controlled_squares_value(board, square, piece):
-    control_bonus = {
-        chess.PAWN: 2,
-        chess.KNIGHT: 2,
-        chess.BISHOP: 2,
-        chess.ROOK: 2,
-        chess.QUEEN: 1,
-    }
-    legal_moves = list(board.attacks(square))
-    empty_squares = [sq for sq in legal_moves if board.piece_at(sq) is None]
-
+def evaluate_material(board):
+    """ Tính toán tổng giá trị quân cờ của cả hai bên """
     score = 0
-
-    if piece.piece_type in {chess.BISHOP, chess.ROOK, chess.QUEEN}:
-        score += (len(empty_squares) // 2) * control_bonus[piece.piece_type]
-    else:
-        score += len(empty_squares) * control_bonus.get(piece.piece_type)
-
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece:
+            value = PIECE_VALUES[piece.piece_type]
+            if piece.color == chess.WHITE:
+                score += value
+            else:
+                score -= value
     return score
 
 
-def safety_score(board, square, color):
-    safety = 0
-    enemy_color = not color
-
-    attacking_enemies = len(list(board.attackers(enemy_color, square)))
-    protecting_allies = len(list(board.attackers(color, square)))
-
-    safety -= attacking_enemies
-    safety += protecting_allies
-
-    return safety
+def evaluate_center_control(board):
+    """ Đánh giá mức độ kiểm soát trung tâm """
+    score = 0
+    for square in CENTER_SQUARES:
+        attackers_white = board.attackers(chess.WHITE, square)
+        attackers_black = board.attackers(chess.BLACK, square)
+        score += len(attackers_white) - len(attackers_black)
+    return score
 
 
-def safety_table(board, color):
-    table = [[0 for _ in range(8)] for _ in range(8)]
-    for square in chess.SQUARES:
-        rank = chess.square_rank(square)
-        file = chess.square_file(square)
-        table[7 - rank][file] = safety_score(board, square, color)
-    return table
-
-
-def threat_score(board, color):
-    threat = 0
+def evaluate_piece_development(board):
+    """ Đánh giá mức độ phát triển quân cờ """
+    score = 0
     for square in chess.SQUARES:
         piece = board.piece_at(square)
-        if piece and piece.color == color:
-            for target in board.attacks(square):
-                target_piece = board.piece_at(target)
-                if target_piece:
-                    if target_piece.color != color:
-                        safety = safety_score(board, target, color)
-                        if safety >= 0:
-                            threat += piece_value(target_piece) - \
-                                piece_value(piece)
-                        if target_piece.piece_type == chess.QUEEN:
-                            threat += 10
-                        if board.is_checkmate():
-                            threat += 99999
-    return threat
+        if piece and piece.piece_type in [chess.KNIGHT, chess.BISHOP]:
+            if piece.color == chess.WHITE:
+                score += 1
+            else:
+                score -= 1
+    return score
 
 
-def evaluate_board(board, color):
-    total_score = 0
-    captured_score = 0
+def evaluate_king_safety(board):
+    """ Kiểm tra độ an toàn của vua (nhập thành hay chưa) """
+    score = 0
+    if board.has_castling_rights(chess.WHITE):
+        score += 2
+    if board.has_castling_rights(chess.BLACK):
+        score -= 2
+    return score
+
+
+def evaluate_pawn_structure(board):
+    """ Đánh giá cấu trúc tốt (tốt cô lập hoặc tốt chồng) """
+    score = 0
+    white_pawn_files = set()
+    black_pawn_files = set()
 
     for square in chess.SQUARES:
         piece = board.piece_at(square)
-        if piece and piece.color == color and piece.piece_type != chess.KING:
-            total_score += piece_value(piece)
-            total_score += controlled_squares_value(board, square, piece)
+        if piece and piece.piece_type == chess.PAWN:
+            if piece.color == chess.WHITE:
+                white_pawn_files.add(chess.square_file(square))
+            else:
+                black_pawn_files.add(chess.square_file(square))
 
-    total_score += threat_score(board, color)
+    # Nếu tốt bị cô lập (chỉ có một mình trên cột)
+    score += len(white_pawn_files) - len(black_pawn_files)
+    return score
 
-    # Tính điểm bắt quân
-    for move in board.legal_moves:
-        if board.is_capture(move):
-            captured_piece = board.piece_at(move.to_square)
-            if captured_piece:
-                if captured_piece.color != color:
-                    # Bắt quân đối thủ (+)
-                    captured_score += piece_value(captured_piece)
-                else:
-                    # Mất quân đồng minh (-)
-                    captured_score -= piece_value(captured_piece)
 
-    total_score += captured_score
+def evaluate_mobility(board):
+    """ Đánh giá mức độ di chuyển của quân cờ """
+    return len(list(board.legal_moves))
+
+
+def evaluate_board(board):
+    """ Tổng hợp tất cả các yếu tố để đánh giá vị trí hiện tại """
+    material = evaluate_material(board)
+    center_control = evaluate_center_control(board)
+    development = evaluate_piece_development(board)
+    king_safety = evaluate_king_safety(board)
+    pawn_structure = evaluate_pawn_structure(board)
+    mobility = evaluate_mobility(board)
+
+    total_score = (material * 10 +
+                   center_control * 5 +
+                   development * 3 +
+                   king_safety * 5 +
+                   pawn_structure * 2 +
+                   mobility * 1)
 
     return total_score
 
 
-def best_move(board, color):
-    best_score = float('-inf')
+def minimax(board, depth, alpha, beta, is_maximizing):
+    """ Thuật toán Minimax với Alpha-Beta Pruning """
+    if depth == 0 or board.is_game_over():
+        return evaluate_board(board)
+
+    legal_moves = list(board.legal_moves)
+
+    if is_maximizing:
+        max_eval = float('-inf')
+        for move in legal_moves:
+            board.push(move)
+            eval = minimax(board, depth - 1, alpha, beta, False)
+            board.pop()
+            max_eval = max(max_eval, eval)
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break  # Cắt tỉa Beta
+        return max_eval
+    else:
+        min_eval = float('inf')
+        for move in legal_moves:
+            board.push(move)
+            eval = minimax(board, depth - 1, alpha, beta, True)
+            board.pop()
+            min_eval = min(min_eval, eval)
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break  # Cắt tỉa Alpha
+        return min_eval
+
+
+def find_best_move(board, depth=3):
+    """ Tìm nước đi tối ưu dựa trên Minimax """
     best_move = None
+    best_value = float('-inf')
+    alpha = float('-inf')
+    beta = float('inf')
 
     for move in board.legal_moves:
         board.push(move)
-        score = evaluate_board(board, color)
+        board_value = minimax(board, depth - 1, alpha, beta, False)
         board.pop()
-        if score > best_score:
-            best_score = score
+
+        if board_value > best_value:
+            best_value = board_value
             best_move = move
 
-    return best_move, best_score
-
-
-def print_safety_table(table):
-    print("\nBảng điểm an toàn:")
-    print("     a  b  c  d  e  f  g  h")
-    for i, row in enumerate(table):
-        print(8 - i, " ", " ".join(f"{x:+d}" for x in row))
-
-
-# Khởi tạo bàn cờ
-board = chess.Board()
-
-# Chơi đến khi ván cờ kết thúc
-while not board.is_game_over():
-    for color in [chess.WHITE, chess.BLACK]:
-        if board.is_game_over():
-            break  # Dừng nếu ván cờ kết thúc
-
-        best_mv, best_score = best_move(board, color)
-        print(
-            f"Nước đi tốt nhất cho {'Trắng' if color == chess.WHITE else 'Đen'}: {best_mv} với điểm số: {best_score}"
-        )
-
-        if best_mv:
-            board.push(best_mv)
-
-        print(board)
-
-# Kiểm tra kết quả ván cờ
-result = board.result()
-if board.is_checkmate():
-    print("Kết quả: Chiếu bí!")
-elif board.is_stalemate():
-    print("Kết quả: Hòa do hết nước đi!")
-elif board.is_insufficient_material():
-    print("Kết quả: Hòa do thiếu quân!")
-elif board.is_seventyfive_moves():
-    print("Kết quả: Hòa do 75 nước đi không bắt quân!")
-elif board.is_fivefold_repetition():
-    print("Kết quả: Hòa do lặp lại 5 lần!")
-
-# In bảng điểm an toàn cuối cùng
-safety_tbl = safety_table(board, chess.WHITE)
-print_safety_table(safety_tbl)
+    return best_move
