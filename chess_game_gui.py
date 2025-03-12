@@ -1,6 +1,3 @@
-
-import chess
-import pygame
 import subprocess
 import sys
 import botngu
@@ -21,7 +18,8 @@ def install_and_import(package):
 # Kiểm tra và cài đặt các thư viện cần thiết
 install_and_import("pygame")
 install_and_import("chess")
-
+import chess
+import pygame
 
 # Sau khi cài đặt xong, import bình thường
 
