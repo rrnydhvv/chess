@@ -84,7 +84,7 @@ def bot_black():
 
 def bot_random():
     global bot_color
-    bot_color = random.choice(chess.WHITE, chess.BLACK)
+    bot_color = random.choice((chess.WHITE, chess.BLACK))
     return "Bot", bot_color
 
 
