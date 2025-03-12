@@ -59,6 +59,20 @@ def evaluate_king_safety(board):
         score += 2
     if board.has_castling_rights(chess.BLACK):
         score -= 2
+
+       # Kiểm tra chiếu và chiếu bí
+    if board.is_check():
+        if board.turn == chess.WHITE:
+            score -= 10  # Trừ điểm nếu trắng bị chiếu
+        else:
+            score += 10  # Cộng điểm nếu đen bị chiếu
+
+    if board.is_checkmate():
+        if board.turn == chess.WHITE:
+            score -= 10000  # Trắng thua (chiếu bí) => điểm rất thấp
+        else:
+            score += 1000  # Đen thua (chiếu bí) => điểm rất cao
+
     return score
 
 
