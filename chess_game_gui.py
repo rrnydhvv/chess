@@ -1,7 +1,10 @@
 
+import chess
+import pygame
 import subprocess
 import sys
-
+import botngu
+import main_menu as m
 # Hàm kiểm tra và cài đặt thư viện nếu chưa có
 
 
@@ -21,8 +24,6 @@ install_and_import("chess")
 
 
 # Sau khi cài đặt xong, import bình thường
-import pygame
-import chess
 
 # Khởi tạo pygame
 pygame.init()
@@ -224,8 +225,10 @@ def display_game_over():
 
 
 def main():
-    global selected_square, highlighted_squares, last_move
+    global selected_square, highlighted_squares, last_move, mode, bot_color
+    mode, bot_color = m.main_menu()
     running = True
+
     while running:
         screen.fill(WHITE)
         if board.is_game_over():
@@ -237,7 +240,13 @@ def main():
 
         if board.is_game_over():
             display_game_over()
-
+        # Nếu đến lượt bot, thực hiện nước đi tự động
+        if mode == "Bot" and board.turn == bot_color:
+            move = botngu.find_best_move(board)
+            if move:
+                board.push(move)
+                last_move = move
+            continue  # Bỏ qua xử lý sự kiện người chơi vì là lượt của bot
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
