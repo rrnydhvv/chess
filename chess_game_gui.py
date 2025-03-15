@@ -1,3 +1,6 @@
+
+import chess
+import pygame
 import subprocess
 import sys
 import botngu
@@ -18,8 +21,7 @@ def install_and_import(package):
 # Kiểm tra và cài đặt các thư viện cần thiết
 install_and_import("pygame")
 install_and_import("chess")
-import chess
-import pygame
+
 
 # Sau khi cài đặt xong, import bình thường
 
@@ -240,7 +242,7 @@ def main():
             display_game_over()
         # Nếu đến lượt bot, thực hiện nước đi tự động
         if mode == "Bot" and board.turn == bot_color:
-            move = botngu.find_best_move(board)
+            move = botngu.find_best_move(board, 3)
             if move:
                 board.push(move)
                 last_move = move
