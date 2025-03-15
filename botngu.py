@@ -1,18 +1,17 @@
 import chess
 import math
 
-# 1. Định nghĩa giá trị vật chất (đơn vị tính theo centipawn, 100 = 1 điểm)
+# 1. Định nghĩa giá trị vật chất (đơn vị centipawn, 100 = 1 điểm)
 piece_values = {
     chess.PAWN: 100,
     chess.KNIGHT: 320,
     chess.BISHOP: 330,
     chess.ROOK: 500,
     chess.QUEEN: 900,
-    chess.KING: 0  # Vua không được tính vì mất vua là thua cuộc
+    chess.KING: 0  # Không tính giá trị của vua vì mất vua tức là thua cuộc
 }
 
-# 2. Các bảng định vị (piece-square tables) cho các quân cờ (cho phía trắng)
-# Các giá trị này được lấy theo một số nguồn tham khảo; bạn có thể điều chỉnh để phù hợp với chiến lược của mình.
+# 2. Các bảng định vị (piece-square tables) cho từng quân cờ (cho phía trắng)
 pawn_table = [
     0,   0,   0,   0,   0,   0,   0,   0,
     5,  10,  10, -20, -20, 10,  10,   5,
@@ -107,8 +106,7 @@ def evaluate_positional(board: chess.Board) -> int:
             table = queen_table
         elif piece.piece_type == chess.KING:
             table = king_table
-        # Với quân trắng, dùng trực tiếp giá trị tại square;
-        # Với quân đen, "lật" bảng bằng chess.square_mirror
+        # Với quân trắng dùng giá trị trực tiếp, còn quân đen "lật" bảng
         table_value = table[square] if piece.color == chess.WHITE else table[chess.square_mirror(
             square)]
         positional += table_value if piece.color == chess.WHITE else -table_value
@@ -118,13 +116,11 @@ def evaluate_positional(board: chess.Board) -> int:
 
 
 def evaluate_mobility(board: chess.Board) -> float:
-    # Tính số nước đi hợp lệ cho cả hai bên
     board_copy = board.copy()
     board_copy.turn = chess.WHITE
     white_moves = len(list(board_copy.legal_moves))
     board_copy.turn = chess.BLACK
     black_moves = len(list(board_copy.legal_moves))
-    # Hệ số nhỏ để không "lấn át" đánh giá vật chất và vị trí
     return 10 * (white_moves - black_moves)
 
 # 6. Hàm đánh giá an toàn của vua
@@ -132,7 +128,6 @@ def evaluate_mobility(board: chess.Board) -> float:
 
 def evaluate_king_safety(board: chess.Board) -> float:
     safety = 0
-    # Đánh giá đơn giản: tính số "lá chắn" của tốt phía trước vua
     for color in [chess.WHITE, chess.BLACK]:
         king_square = board.king(color)
         if king_square is None:
@@ -140,7 +135,6 @@ def evaluate_king_safety(board: chess.Board) -> float:
         king_file = chess.square_file(king_square)
         king_rank = chess.square_rank(king_square)
         pawn_shield = 0
-        # Với quân trắng, tốt phía trước nằm ở hàng tiếp theo; với đen thì ngược lại
         forward = 1 if color == chess.WHITE else -1
         for df in [-1, 0, 1]:
             file = king_file + df
@@ -150,13 +144,10 @@ def evaluate_king_safety(board: chess.Board) -> float:
                 piece = board.piece_at(square)
                 if piece and piece.piece_type == chess.PAWN and piece.color == color:
                     pawn_shield += 1
-        if color == chess.WHITE:
-            safety += 15 * pawn_shield
-        else:
-            safety -= 15 * pawn_shield
+        safety += 15 * pawn_shield if color == chess.WHITE else -15 * pawn_shield
     return safety
 
-# 7. Hàm đánh giá cấu trúc tốt (doubled, isolated)
+# 7. Hàm đánh giá cấu trúc tốt (đánh giá các tốt gấp đôi và tốt đơn lẻ)
 
 
 def evaluate_pawn_structure(board: chess.Board) -> float:
@@ -166,40 +157,40 @@ def evaluate_pawn_structure(board: chess.Board) -> float:
         pawns = board.pieces(chess.PAWN, color)
         files = [chess.square_file(sq) for sq in pawns]
         penalty = 0
-        # Phạt các tốt gấp đôi trên 1 cột
+        # Phạt các tốt gấp đôi
         for file in range(8):
             count = files.count(file)
             if count > 1:
-                # phạt 20 centipawn cho mỗi tốt gấp đôi
                 penalty += (count - 1) * 20
-        # Phạt tốt đơn lẻ (isolated): nếu không có đồng minh ở cột kề
+        # Phạt tốt đơn lẻ (isolated)
         for pawn in pawns:
             file = chess.square_file(pawn)
             if (file - 1 not in files) and (file + 1 not in files):
-                penalty += 15  # phạt 15 centipawn
+                penalty += 15
         if color == chess.WHITE:
             white_penalty = penalty
         else:
             black_penalty = penalty
-    # Tính hiệu lệch, vì tốt kém làm giảm thế cho bên đó
     return -white_penalty + black_penalty
 
-# 8. Hàm đánh giá tổng hợp
+# 8. Hàm đánh giá tổng hợp, bổ sung yếu tố chiếu bí
 
 
 def evaluate_board(board: chess.Board) -> float:
-    """
-    Hàm đánh giá tổng hợp thế cờ.
-    Giá trị dương cho thế cờ nghiêng về trắng,
-    giá trị âm cho thế cờ nghiêng về đen.
-    """
+    # Nếu chiếu bí: trả về giá trị cực đại (nếu đối phương bị chiếu bí) hoặc cực tiểu
+    if board.is_checkmate():
+        # Ở trạng thái chiếu bí, bên nào có lượt đi hiện tại là bên bị thua
+        return -100000 if board.turn == chess.WHITE else 100000
+    # Nếu hòa hoặc không đủ lực đánh, trả về 0
+    if board.is_stalemate() or board.is_insufficient_material():
+        return 0
+
     eval_material = evaluate_material(board)
     eval_positional = evaluate_positional(board)
     eval_mobility = evaluate_mobility(board)
     eval_king_safety = evaluate_king_safety(board)
     eval_pawn_structure = evaluate_pawn_structure(board)
 
-    # Tổng hợp với các hệ số trọng số có thể điều chỉnh
     total_evaluation = (eval_material +
                         eval_positional +
                         eval_mobility +
