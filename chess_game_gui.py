@@ -4,7 +4,7 @@ import subprocess
 import sys
 import botngu
 import stockfish
-import main_menu as m
+import menu as m
 # Hàm kiểm tra và cài đặt thư viện nếu chưa có
 
 
