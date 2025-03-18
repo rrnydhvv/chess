@@ -1,3 +1,5 @@
+import time
+import os
 import subprocess
 import sys
 import botngu
@@ -21,10 +23,9 @@ install_and_import("chess")
 
 
 # Sau khi cài đặt xong, import bình thường
-import chess
-import chess.engine
 import pygame
-
+import chess.engine
+import chess
 
 # Khởi tạo pygame
 pygame.init()
@@ -150,27 +151,22 @@ def pawn_promotion(color):
 
 
 def display_game_over():
+    global last_move
     if board.is_checkmate():
-        if board.turn == chess.BLACK:
-            background_color = WHITE
-            text_color = BLACK
-        else:
-            background_color = BLACK
-            text_color = WHITE
+        background_color = WHITE if board.turn == chess.BLACK else BLACK
+        text_color = BLACK if board.turn == chess.BLACK else WHITE
         text = "Victory: " + ("White" if board.turn ==
                               chess.BLACK else "Black")
     elif board.is_stalemate() or board.is_insufficient_material() or board.is_seventyfive_moves() or board.is_fivefold_repetition():
-        # Nửa trên đen, nửa dưới trắng
         screen.fill(BLACK, (0, 0, WIDTH, HEIGHT // 2))
         screen.fill(WHITE, (0, HEIGHT // 2, WIDTH, HEIGHT // 2))
-        text_color = WHITE  # Chữ màu trắng cho phần trên
+        text_color = WHITE
         text = "Draw!"
     else:
         text_color = BLACK
         background_color = WHITE
         text = "Game Over!"
 
-    # Nếu không hòa, tô nền theo màu tương ứng
     if not (board.is_stalemate() or board.is_insufficient_material() or board.is_seventyfive_moves() or board.is_fivefold_repetition()):
         screen.fill(background_color)
 
@@ -181,17 +177,16 @@ def display_game_over():
 
     button_font = pygame.font.Font(None, 32)
     button_width, button_height = 150, 50
-    button_spacing = 20  # Khoảng cách giữa các nút
+    button_spacing = 20
 
     new_game_x = (WIDTH - (2 * button_width + button_spacing)) // 2
     exit_x = new_game_x + button_width + button_spacing
-    button_y = HEIGHT // 2 + 50  # Hạ xuống để không nằm giữa màn hình
+    button_y = HEIGHT // 2 + 50
 
     new_game_button = pygame.Rect(
         new_game_x, button_y, button_width, button_height)
     exit_button = pygame.Rect(exit_x, button_y, button_width, button_height)
 
-    # Nếu hòa, đặt màu viền khác nhau cho hai nửa màn hình
     if board.is_stalemate() or board.is_insufficient_material() or board.is_seventyfive_moves() or board.is_fivefold_repetition():
         pygame.draw.rect(screen, BLACK, new_game_button, 3)
         pygame.draw.rect(screen, BLACK, exit_button, 3)
@@ -206,15 +201,10 @@ def display_game_over():
     new_game_text = button_font.render("New Game", True, new_game_text_color)
     exit_text = button_font.render("Exit", True, exit_text_color)
 
-    new_game_text_x = new_game_button.x + \
-        (button_width - new_game_text.get_width()) // 2
-    new_game_text_y = new_game_button.y + \
-        (button_height - new_game_text.get_height()) // 2
-    screen.blit(new_game_text, (new_game_text_x, new_game_text_y))
-
-    exit_text_x = exit_button.x + (button_width - exit_text.get_width()) // 2
-    exit_text_y = exit_button.y + (button_height - exit_text.get_height()) // 2
-    screen.blit(exit_text, (exit_text_x, exit_text_y))
+    screen.blit(new_game_text, (new_game_button.x + (button_width - new_game_text.get_width()
+                                                     ) // 2, new_game_button.y + (button_height - new_game_text.get_height()) // 2))
+    screen.blit(exit_text, (exit_button.x + (button_width - exit_text.get_width()) //
+                2, exit_button.y + (button_height - exit_text.get_height()) // 2))
 
     pygame.display.flip()
 
@@ -223,33 +213,38 @@ def display_game_over():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
-                exit()
+                os._exit(0)  # Thoát hoàn toàn chương trình và kill terminal
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if new_game_button.collidepoint(event.pos):
                     board.reset()
+                    last_move = None
                     waiting = False
                 elif exit_button.collidepoint(event.pos):
                     pygame.quit()
-                    exit()
+                    os._exit(0)  # Kill terminal khi nhấn Exit
 
 
 def main():
     global selected_square, highlighted_squares, last_move, mode, bot_type, bot_color
     mode, bot_type, bot_color = m.main_menu()
     running = True
-    STOCKFISH_PATH = "stockfish/stockfish-windows-x86-64-avx2.exe"
+    if mode is None and bot_type is None and bot_color is None:
+        running = False
+        return
+    if bot_type == "Stockfish":
+        STOCKFISH_PATH = "stockfish-windows-x86-64-avx2/stockfish/stockfish-windows-x86-64-avx2.exe"
     engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
     while running:
         screen.fill(WHITE)
         if board.is_game_over():
+            draw_board()
+            draw_pieces()
+            pygame.display.flip()
+            time.sleep(2)
             display_game_over()
-            last_move = None
         draw_board()
         draw_pieces()
         pygame.display.flip()
-
-        if board.is_game_over():
-            display_game_over()
         # Nếu đến lượt bot, thực hiện nước đi tự động
         if mode == "Bot" and board.turn == bot_color:
             if bot_type == "Botngu":
