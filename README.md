@@ -1,3 +1,3 @@
-download and extract Stockfish: [link](https://stockfishchess.org/download/)
+download and extract Stockfish in the same directory with chess_game_gui.py: [link](https://stockfishchess.org/download/)
 
-extract images, run file chess_game_gui.py
+run chess_game_gui.py
