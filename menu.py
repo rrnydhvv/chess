@@ -14,9 +14,8 @@ pygame.display.set_caption("Main Menu - Chess")
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (200, 200, 200)
-HOVER_COLOR = (170, 170, 170)
-CLICK_COLOR = (150, 150, 150)
-
+HOVER_COLOR = (170, 170, 170)  # Màu khi hover
+CLICK_COLOR = (150, 150, 150)  # Màu khi click
 # Font chữ
 font = pygame.font.Font(None, 30)
 
@@ -28,13 +27,13 @@ class Button:
         self.text = text
         self.rect = pygame.Rect(WIDTH // 2 - 110, y_offset, 220, 50)
         self.callback = callback
-        self.color = GRAY
+        self.color = WHITE
         self.hovered = False
         self.clicked = False
 
     def draw(self, screen):
         color = CLICK_COLOR if self.clicked else (
-            HOVER_COLOR if self.hovered else GRAY)
+            HOVER_COLOR if self.hovered else WHITE)
         pygame.draw.rect(screen, color, self.rect, border_radius=5)
         pygame.draw.rect(screen, BLACK, self.rect, 2)  # Viền đen
 
