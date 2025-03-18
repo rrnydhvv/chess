@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 import botngu
+import stockfish
 import main_menu as m
 # Hàm kiểm tra và cài đặt thư viện nếu chưa có
 
@@ -151,7 +152,10 @@ def pawn_promotion(color):
 
 
 def display_game_over():
-    global last_move
+    global last_move, selected_square, highlighted_squares
+    selected_square = None
+    highlighted_squares = []
+    last_move = None
     if board.is_checkmate():
         background_color = WHITE if board.turn == chess.BLACK else BLACK
         text_color = BLACK if board.turn == chess.BLACK else WHITE
@@ -217,11 +221,76 @@ def display_game_over():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if new_game_button.collidepoint(event.pos):
                     board.reset()
-                    last_move = None
                     waiting = False
                 elif exit_button.collidepoint(event.pos):
                     pygame.quit()
                     os._exit(0)  # Kill terminal khi nhấn Exit
+
+
+def esc_menu(screen):
+    menu_running = True
+    font = pygame.font.Font(None, 36)
+    global last_move, selected_square, highlighted_squares, mode, bot_type, bot_color
+    selected_square = None
+    highlighted_squares = []
+    last_move = None
+    screen_width, screen_height = 480, 480
+    button_width, button_height = 200, 60
+    button_x = (screen_width - button_width) // 2
+
+    # Tạo các nút
+    main_menu_button = pygame.Rect(button_x, 150, button_width, button_height)
+    new_game_button = pygame.Rect(button_x, 230, button_width, button_height)
+    exit_button = pygame.Rect(button_x, 310, button_width, button_height)
+
+    # Tạo các nút
+    main_menu_button = pygame.Rect(button_x, 150, button_width, button_height)
+    new_game_button = pygame.Rect(button_x, 230, button_width, button_height)
+    exit_button = pygame.Rect(button_x, 310, button_width, button_height)
+
+    while menu_running:
+        screen.fill((255, 255, 255))  # Nền trắng
+
+        mouse_pos = pygame.mouse.get_pos()
+
+        for button in [main_menu_button, new_game_button, exit_button]:
+            color = (200, 200, 200) if button.collidepoint(
+                mouse_pos) else (255, 255, 255)
+            pygame.draw.rect(screen, color, button)
+            pygame.draw.rect(screen, (0, 0, 0), button, 3)  # Viền đen
+
+        # Vẽ chữ lên nút
+        for text, button in zip(["Main Menu", "New Game", "Exit"],
+                                [main_menu_button, new_game_button, exit_button]):
+            text_surface = font.render(text, True, (0, 0, 0))
+            text_rect = text_surface.get_rect(center=button.center)
+            screen.blit(text_surface, text_rect)
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                os._exit(0)
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                menu_running = False  # Thoát menu khi nhấn ESC lần nữa
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if main_menu_button.collidepoint(event.pos):
+                    board.reset()
+                    selected_square = None
+                    highlighted_squares = []
+                    last_move = None
+                    mode, bot_type, bot_color = m.main_menu()
+                    menu_running = False
+                elif new_game_button.collidepoint(event.pos):
+                    selected_square = None
+                    highlighted_squares = []
+                    last_move = None
+                    board.reset()
+                    menu_running = False
+                elif exit_button.collidepoint(event.pos):
+                    pygame.quit()
+                    os._exit(0)
 
 
 def main():
@@ -231,9 +300,7 @@ def main():
     if mode is None and bot_type is None and bot_color is None:
         running = False
         return
-    if bot_type == "Stockfish":
-        STOCKFISH_PATH = "stockfish-windows-x86-64-avx2/stockfish/stockfish-windows-x86-64-avx2.exe"
-    engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+
     while running:
         screen.fill(WHITE)
         if board.is_game_over():
@@ -250,16 +317,17 @@ def main():
             if bot_type == "Botngu":
                 move = botngu.find_best_move(board, 3)
             else:
-                result = engine.play(board, chess.engine.Limit(
-                    time=2.0))  # Stockfish suy nghĩ 2 giây
-                move = result.move
+                move = stockfish.move(board)
             if move:
                 board.push(move)
                 last_move = move
             continue  # Bỏ qua xử lý sự kiện người chơi vì là lượt của bot
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                os._exit(0)
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:  # Khi nhấn ESC, gọi menu Game Over
+                    esc_menu(screen)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 square = get_square_from_pos(event.pos)
                 if selected_square is None:
