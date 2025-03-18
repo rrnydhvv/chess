@@ -150,7 +150,7 @@ def display_game_over():
     if board.is_checkmate():
         background_color = WHITE if board.turn == chess.BLACK else BLACK
         text_color = BLACK if board.turn == chess.BLACK else WHITE
-        text = f"Victory: {'White' if board.turn == chess.BLACK else 'Black'} + {bot_type if mode == 'bot' else 'Player'}"
+        text = f"Victory: {'White' if board.turn == chess.BLACK else 'Black'} {bot_type if mode == 'Bot' else 'Player'}"
     elif board.is_stalemate() or board.is_insufficient_material() or board.is_seventyfive_moves() or board.is_fivefold_repetition():
         screen.fill(BLACK, (0, 0, WIDTH, HEIGHT // 2))
         screen.fill(WHITE, (0, HEIGHT // 2, WIDTH, HEIGHT // 2))
