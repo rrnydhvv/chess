@@ -21,9 +21,10 @@ install_and_import("chess")
 
 
 # Sau khi cài đặt xong, import bình thường
-
 import chess
+import chess.engine
 import pygame
+
 
 # Khởi tạo pygame
 pygame.init()
@@ -65,48 +66,56 @@ mode = None  # Lưu chế độ chơi ('PVP' hoặc 'BOT')
 
 
 def draw_board():
+    flipped = bot_color == chess.WHITE  # Nếu bot chơi trắng, đảo ngược bàn cờ
     for row in range(8):
         for col in range(8):
-            # Đảo ngược trục Y để trắng ở dưới
-            square = chess.square(col, 7 - row)
+            draw_row = 7 - row if flipped else row
+            draw_col = 7 - col if flipped else col
+            square = chess.square(draw_col, 7 - draw_row)
             color = LIGHT_BROWN if (row + col) % 2 == 0 else DARK_BROWN
 
             if last_move:
                 if square == last_move.from_square or square == last_move.to_square:
-                    color = LAST_MOVE_COLOR  # Đánh dấu ô của nước đi cuối cùng
+                    color = LAST_MOVE_COLOR
 
             if square in highlighted_squares:
                 if board.piece_at(square):
                     if board.piece_at(square).color != board.piece_at(selected_square).color:
-                        color = CAPTURE_COLOR  # Ô có thể ăn quân
+                        color = CAPTURE_COLOR
                 else:
                     if board.piece_at(selected_square).piece_type == chess.PAWN and chess.square_file(square) != chess.square_file(selected_square):
-                        color = CAPTURE_COLOR  # Bắt tốt qua đường
+                        color = CAPTURE_COLOR
                     else:
-                        color = TARGET_COLOR  # Ô có thể đi
+                        color = TARGET_COLOR
             elif square == selected_square:
-                color = HIGHLIGHT_COLOR  # Ô đang được chọn
+                color = HIGHLIGHT_COLOR
             pygame.draw.rect(screen, color, (col * SQUARE_SIZE,
                              row * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
 
 
 def draw_pieces():
+    flipped = bot_color == chess.WHITE
     for square in chess.SQUARES:
         piece = board.piece_at(square)
         if piece:
             piece_color = 'w' if piece.color == chess.WHITE else 'b'
             piece_type = piece.symbol().lower()
             piece_image = piece_images[f"{piece_color}{piece_type}"]
-            col, row = chess.square_file(
-                square), 7 - chess.square_rank(square)  # Đảo ngược trục Y
-            screen.blit(piece_image, (col * SQUARE_SIZE, row * SQUARE_SIZE))
+            col, row = chess.square_file(square), chess.square_rank(square)
+            if flipped:
+                col, row = 7 - col, 7 - row
+            screen.blit(piece_image, (col * SQUARE_SIZE,
+                        (7 - row) * SQUARE_SIZE))
 
 
 def get_square_from_pos(pos):
     x, y = pos
+    flipped = bot_color == chess.WHITE
     col = x // SQUARE_SIZE
-    row = 7 - (y // SQUARE_SIZE)  # Đảo ngược trục Y
-    return chess.square(col, row)
+    row = y // SQUARE_SIZE
+    if flipped:
+        col, row = 7 - col, 7 - row
+    return chess.square(col, 7 - row)
 
 
 def pawn_promotion(color):
@@ -225,10 +234,11 @@ def display_game_over():
 
 
 def main():
-    global selected_square, highlighted_squares, last_move, mode, bot_color
-    mode, bot_color = m.main_menu()
+    global selected_square, highlighted_squares, last_move, mode, bot_type, bot_color
+    mode, bot_type, bot_color = m.main_menu()
     running = True
-
+    STOCKFISH_PATH = "stockfish/stockfish-windows-x86-64-avx2.exe"
+    engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
     while running:
         screen.fill(WHITE)
         if board.is_game_over():
@@ -242,7 +252,12 @@ def main():
             display_game_over()
         # Nếu đến lượt bot, thực hiện nước đi tự động
         if mode == "Bot" and board.turn == bot_color:
-            move = botngu.find_best_move(board, 3)
+            if bot_type == "Botngu":
+                move = botngu.find_best_move(board, 3)
+            else:
+                result = engine.play(board, chess.engine.Limit(
+                    time=2.0))  # Stockfish suy nghĩ 2 giây
+                move = result.move
             if move:
                 board.push(move)
                 last_move = move
